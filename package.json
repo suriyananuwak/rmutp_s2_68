@@ -1,8 +1,21 @@
 {
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsc && node dist/server.js",
+    "dev:ts": "ts-node src/server.ts",
+    "watch": "tsc --watch & nodemon dist/server.js"
+  },
   "dependencies": {
     "@hono/node-server": "^1.18.2",
     "@prisma/client": "^6.14.0",
     "hono": "^4.9.2",
     "prisma": "^6.14.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "nodemon": "^3.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.0"
   }
 }
