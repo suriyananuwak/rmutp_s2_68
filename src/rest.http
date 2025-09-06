@@ -1,0 +1,326 @@
+### Base URL Configuration
+@baseUrl = http://localhost:3000
+
+### ========================================
+### Basic Health Check
+### ========================================
+
+### Test server is running
+GET {{baseUrl}}/
+Accept: text/plain
+
+### Original profile page
+GET {{baseUrl}}/profile
+Accept: text/plain
+
+### ========================================
+### CREATE PROFILE TESTS (POST /profiles)
+### ========================================
+
+### 1. Create new profile - Success case
+POST {{baseUrl}}/profiles
+Content-Type: application/json
+
+{
+  "username": "TestName2",
+  "mobile": "0890000001",
+  "cardId": "1340100000001",
+  "password": "mypassword123"
+}
+
+### 2. Create another profile - Success case
+POST {{baseUrl}}/profiles
+Content-Type: application/json
+
+{
+  "username": "TestName3",
+  "mobile": "0890000002",
+  "cardId": "1340100000002",
+  "password": "janepassword456"
+}
+
+### 3. Create profile with Thai username
+POST {{baseUrl}}/profiles
+Content-Type: application/json
+
+{
+  "username": "สมชาย_ใจดี",
+  "mobile": "0611234567",
+  "cardId": "1112223334445",
+  "password": "thaiuser789"
+}
+
+### ========================================
+### CREATE PROFILE ERROR CASES
+### ========================================
+
+### 4. Missing required fields - Should fail
+POST {{baseUrl}}/profiles
+Content-Type: application/json
+
+{
+  "username": "incomplete_user",
+  "mobile": "0812345678"
+}
+
+### 5. Invalid mobile length (not 10 digits) - Should fail
+POST {{baseUrl}}/profiles
+Content-Type: application/json
+
+{
+  "username": "invalid_mobile",
+  "mobile": "081234567", 
+  "cardId": "1234567890123",
+  "password": "password123"
+}
+
+### 6. Invalid cardId length (not 13 digits) - Should fail
+POST {{baseUrl}}/profiles
+Content-Type: application/json
+
+{
+  "username": "invalid_card",
+  "mobile": "0812345679",
+  "cardId": "123456789012",
+  "password": "password123"
+}
+
+### 7. Duplicate username - Should fail
+POST {{baseUrl}}/profiles
+Content-Type: application/json
+
+{
+  "username": "TestName2",
+  "mobile": "0823456789",
+  "cardId": "2234567890123",
+  "password": "anotherpassword"
+}
+
+### 8. Duplicate mobile - Should fail
+POST {{baseUrl}}/profiles
+Content-Type: application/json
+
+{
+  "username": "different_user",
+  "mobile": "0812345678",
+  "cardId": "3334567890123",
+  "password": "differentpassword"
+}
+
+### 9. Duplicate cardId - Should fail
+POST {{baseUrl}}/profiles
+Content-Type: application/json
+
+{
+  "username": "another_user",
+  "mobile": "0834567890",
+  "cardId": "1234567890123",
+  "password": "yetanotherpassword"
+}
+
+### ========================================
+### VIEW PROFILE TESTS (POST /profiles/view)
+### ========================================
+
+### 10. View profile with correct credentials - Success
+POST {{baseUrl}}/profiles/view
+Content-Type: application/json
+
+{
+  "mobile": "0812345678",
+  "password": "pass1234"
+}
+
+### 11. View another profile with correct credentials - Success
+POST {{baseUrl}}/profiles/view
+Content-Type: application/json
+
+{
+  "mobile": "0890000002", 
+  "password": "janepassword456"
+}
+
+### 12. View Thai user profile - Success
+POST {{baseUrl}}/profiles/view
+Content-Type: application/json
+
+{
+  "mobile": "0611234567",
+  "password": "thaiuser789"
+}
+
+### ========================================
+### VIEW PROFILE ERROR CASES
+### ========================================
+
+### 13. Wrong password - Should fail
+POST {{baseUrl}}/profiles/view
+Content-Type: application/json
+
+{
+  "mobile": "0812345678",
+  "password": "wrongpassword"
+}
+
+### 14. Wrong mobile - Should fail
+POST {{baseUrl}}/profiles/view
+Content-Type: application/json
+
+{
+  "mobile": "0899999999",
+  "password": "mypassword123"
+}
+
+### 15. Missing mobile field - Should fail
+POST {{baseUrl}}/profiles/view
+Content-Type: application/json
+
+{
+  "password": "mypassword123"
+}
+
+### 16. Missing password field - Should fail
+POST {{baseUrl}}/profiles/view
+Content-Type: application/json
+
+{
+  "mobile": "0812345678"
+}
+
+### 17. Empty credentials - Should fail
+POST {{baseUrl}}/profiles/view
+Content-Type: application/json
+
+{
+  "mobile": "",
+  "password": ""
+}
+
+### ========================================
+### ADMIN FEATURES (Bonus)
+### ========================================
+
+### 18. Get all profiles (Admin view) - Success
+GET {{baseUrl}}/profiles
+Accept: application/json
+
+### ========================================
+### COMPLETE WORKFLOW TEST
+### ========================================
+
+### 19. Complete workflow test - Create then view
+# Step 1: Create a test user
+POST {{baseUrl}}/profiles
+Content-Type: application/json
+
+{
+  "username": "workflow_test",
+  "mobile": "0855555555",
+  "cardId": "5555555555555",
+  "password": "workflowpass123"
+}
+
+### Step 2: View the created user
+POST {{baseUrl}}/profiles/view
+Content-Type: application/json
+
+{
+  "mobile": "0855555555",
+  "password": "workflowpass123"
+}
+
+### ========================================
+### EDGE CASES AND SPECIAL CHARACTERS
+### ========================================
+
+### 20. Profile with special characters in username
+POST {{baseUrl}}/profiles
+Content-Type: application/json
+
+{
+  "username": "user_with-special.chars@123",
+  "mobile": "0866666666",
+  "cardId": "6666666666666",
+  "password": "specialchars!@#"
+}
+
+### 21. Profile with numbers only username
+POST {{baseUrl}}/profiles
+Content-Type: application/json
+
+{
+  "username": "1234567890",
+  "mobile": "0877777777",
+  "cardId": "7777777777777",
+  "password": "numbersonly"
+}
+
+### 22. Profile with very long username
+POST {{baseUrl}}/profiles
+Content-Type: application/json
+
+{
+  "username": "very_long_username_that_might_cause_issues_but_should_still_work_fine",
+  "mobile": "0888888888",
+  "cardId": "8888888888888",
+  "password": "verylongusername"
+}
+
+### ========================================
+### PERFORMANCE TESTS
+### ========================================
+
+### 23. Multiple rapid requests (simulate concurrent users)
+POST {{baseUrl}}/profiles
+Content-Type: application/json
+
+{
+  "username": "rapid_user_1",
+  "mobile": "0891111111",
+  "cardId": "9111111111111",
+  "password": "rapid123"
+}
+
+### 24. Another rapid request
+POST {{baseUrl}}/profiles
+Content-Type: application/json
+
+{
+  "username": "rapid_user_2", 
+  "mobile": "0892222222",
+  "cardId": "9222222222222",
+  "password": "rapid456"
+}
+
+### ========================================
+### VERIFICATION TESTS (ข้อ 1 และ 2 ตามโจทย์)
+### ========================================
+
+### ข้อ 1: ดูรายละเอียดของ profile ใด ๆ ก็ได้
+### (ผ่าน mobile + password authentication)
+POST {{baseUrl}}/profiles/view
+Content-Type: application/json
+
+{
+  "mobile": "0812345678",
+  "password": "mypassword123"
+}
+
+### ข้อ 2: เพิ่ม profile ใหม่ ๆ เข้าไปได้
+POST {{baseUrl}}/profiles
+Content-Type: application/json
+
+{
+  "username": "requirement_test",
+  "mobile": "0893333333",
+  "cardId": "9333333333333", 
+  "password": "reqtest789"
+}
+
+### ========================================
+### CLEANUP TESTS (for development)
+### ========================================
+
+### View all profiles to see what we created
+GET {{baseUrl}}/profiles
+Accept: application/json
