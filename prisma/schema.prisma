@@ -17,8 +17,10 @@ datasource db {
 // Setup schema
 model Profile {
   id       String @id @default(uuid())
-  username String @unique
-  password String
-  mobile   String @unique @db.VarChar(10)
-  cardId   String @unique @db.VarChar(13)
+  username String @unique @db.Text
+  password String @db.Text
+  mobile   String @unique @db.Text
+  cardId   String @unique @db.Text
+
+  @@map("profiles")
 }
