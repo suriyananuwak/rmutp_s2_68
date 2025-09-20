@@ -13,315 +13,221 @@ Accept: text/plain
 GET {{baseUrl}}/profile
 Accept: text/plain
 
-### ========================================
-### CREATE PROFILE TESTS (POST /profiles)
-### ========================================
-
-### 1. Create new profile - Success case
-POST {{baseUrl}}/profiles
+###
+# 4. สร้าง testuser1 ด้วย POST /encode (เข้ารหัส)
+POST {{baseUrl}}/encode
 Content-Type: application/json
 
 {
-  "username": "TestName2",
-  "mobile": "0890000001",
-  "cardId": "1340100000001",
-  "password": "mypassword123"
-}
-
-### 2. Create another profile - Success case
-POST {{baseUrl}}/profiles
-Content-Type: application/json
-
-{
-  "username": "TestName3",
-  "mobile": "0890000002",
-  "cardId": "1340100000002",
-  "password": "janepassword456"
-}
-
-### 3. Create profile with Thai username
-POST {{baseUrl}}/profiles
-Content-Type: application/json
-
-{
-  "username": "สมชาย_ใจดี",
-  "mobile": "0611234567",
-  "cardId": "1112223334445",
-  "password": "thaiuser789"
-}
-
-### ========================================
-### CREATE PROFILE ERROR CASES
-### ========================================
-
-### 4. Missing required fields - Should fail
-POST {{baseUrl}}/profiles
-Content-Type: application/json
-
-{
-  "username": "incomplete_user",
-  "mobile": "0812345678"
-}
-
-### 5. Invalid mobile length (not 10 digits) - Should fail
-POST {{baseUrl}}/profiles
-Content-Type: application/json
-
-{
-  "username": "invalid_mobile",
-  "mobile": "081234567", 
+  "username": "testanuwak1",
+  "mobile": "0812345678",
   "cardId": "1234567890123",
   "password": "password123"
 }
 
-### 6. Invalid cardId length (not 13 digits) - Should fail
-POST {{baseUrl}}/profiles
+###
+# 5. สร้าง testuser2 ด้วย POST /encode (เข้ารหัส) 
+POST {{baseUrl}}/encode
 Content-Type: application/json
 
 {
-  "username": "invalid_card",
-  "mobile": "0812345679",
-  "cardId": "123456789012",
-  "password": "password123"
+  "username": "testanuwak2",
+  "mobile": "0887654321",
+  "cardId": "9876543210987",
+  "password": "password456"
 }
 
-### 7. Duplicate username - Should fail
+###
+# 6. สร้าง testuser3 ด้วย POST /profiles (ปกติ - ไม่เข้ารหัส)
 POST {{baseUrl}}/profiles
 Content-Type: application/json
 
 {
-  "username": "TestName2",
+  "username": "testanuwak3",
   "mobile": "0823456789",
-  "cardId": "2234567890123",
-  "password": "anotherpassword"
+  "cardId": "1357924680246",
+  "password": "password789"
 }
 
-### 8. Duplicate mobile - Should fail
-POST {{baseUrl}}/profiles
+###
+# 7. ดูข้อมูล Profiles ทั้งหมด (หลังสร้าง 3 users)
+GET {{baseUrl}}/profiles
+
+### ===== ทดสอบ Error Cases =====
+
+###
+# 8. Error: Username ซ้ำ
+POST {{baseUrl}}/encode
 Content-Type: application/json
 
 {
-  "username": "different_user",
+  "username": "testuser1",
+  "mobile": "0811111111", 
+  "cardId": "1111111111111",
+  "password": "newpassword"
+}
+
+###
+# 9. Error: Mobile ซ้ำ
+POST {{baseUrl}}/encode
+Content-Type: application/json
+
+{
+  "username": "newuser1",
   "mobile": "0812345678",
-  "cardId": "3334567890123",
-  "password": "differentpassword"
+  "cardId": "2222222222222", 
+  "password": "newpassword"
 }
 
-### 9. Duplicate cardId - Should fail
-POST {{baseUrl}}/profiles
+###
+# 10. Error: CardId ซ้ำ
+POST {{baseUrl}}/encode
 Content-Type: application/json
 
 {
-  "username": "another_user",
-  "mobile": "0834567890",
+  "username": "newuser2",
+  "mobile": "0822222222",
   "cardId": "1234567890123",
-  "password": "yetanotherpassword"
+  "password": "newpassword"
 }
 
-### ========================================
-### VIEW PROFILE TESTS (POST /profiles/view)
-### ========================================
+###
+# 11. Error: Mobile น้อยกว่า 10 หลัก
+POST {{baseUrl}}/encode
+Content-Type: application/json
 
-### 10. View profile with correct credentials - Success
+{
+  "username": "erroruser1",
+  "mobile": "081234567",
+  "cardId": "3333333333333",
+  "password": "password"
+}
+
+###
+# 12. Error: Mobile มากกว่า 10 หลัก
+POST {{baseUrl}}/encode
+Content-Type: application/json
+
+{
+  "username": "erroruser2", 
+  "mobile": "08123456789",
+  "cardId": "4444444444444",
+  "password": "password"
+}
+
+###
+# 13. Error: CardId น้อยกว่า 13 หลัก
+POST {{baseUrl}}/encode
+Content-Type: application/json
+
+{
+  "username": "erroruser3",
+  "mobile": "0833333333",
+  "cardId": "123456789012",
+  "password": "password"
+}
+
+###
+# 14. Error: CardId มากกว่า 13 หลัก
+POST {{baseUrl}}/encode
+Content-Type: application/json
+
+{
+  "username": "erroruser4",
+  "mobile": "0844444444", 
+  "cardId": "12345678901234",
+  "password": "password"
+}
+
+###
+# 15. Error: ข้อมูลไม่ครบ
+POST {{baseUrl}}/encode
+Content-Type: application/json
+
+{
+  "username": "incompleteuser",
+  "mobile": "0855555555"
+}
+
+### ===== ทดสอบการอ่านข้อมูล =====
+
+###
+# 16. ดู Profile ตาม ID (ใส่ ID จริงจาก step 7)
+GET {{baseUrl}}/profile/5ced4ce6-319a-4008-9576-a9bdd30d1b71
+
+###
+# 17. ถอดรหัส Profile (ใส่ ID ของ testuser1 หรือ testuser2)
+POST {{baseUrl}}/decode
+Content-Type: application/json
+
+{
+  "id": "5ced4ce6-319a-4008-9576-a9bdd30d1b71"
+}
+
+###
+# 18. ถอดรหัส Profile ที่ไม่มี
+POST {{baseUrl}}/decode
+Content-Type: application/json
+
+{
+  "id": "non-existent-id"
+}
+
+###
+# 19. ถอดรหัสโดยไม่ใส่ ID
+POST {{baseUrl}}/decode
+Content-Type: application/json
+
+{}
+
+### ===== ทดสอบ Login และ View =====
+
+###
+# 20. Login testuser1 (encrypted user)
+POST {{baseUrl}}/profiles/login
+Content-Type: application/json
+
+{
+  "username": "testuser1",
+  "password": "password123"
+}
+
+###
+# 21. Login testuser3 (plain text user)  
+POST {{baseUrl}}/profiles/login
+Content-Type: application/json
+
+{
+  "username": "testuser3",
+  "password": "password789"
+}
+
+###
+# 22. View Profile ด้วย mobile + password (testuser1)
 POST {{baseUrl}}/profiles/view
 Content-Type: application/json
 
 {
   "mobile": "0812345678",
-  "password": "pass1234"
+  "password": "password123"
 }
 
-### 11. View another profile with correct credentials - Success
-POST {{baseUrl}}/profiles/view
+###
+# 23. View Profile ด้วย mobile + password (testuser3)
+POST {{baseUrl}}/profiles/view  
 Content-Type: application/json
 
 {
-  "mobile": "0890000002", 
-  "password": "janepassword456"
+  "mobile": "0823456789",
+  "password": "password789"
 }
 
-### 12. View Thai user profile - Success
-POST {{baseUrl}}/profiles/view
+###
+# 24. Login ด้วยข้อมูลผิด
+POST {{baseUrl}}/profiles/login
 Content-Type: application/json
 
 {
-  "mobile": "0611234567",
-  "password": "thaiuser789"
-}
-
-### ========================================
-### VIEW PROFILE ERROR CASES
-### ========================================
-
-### 13. Wrong password - Should fail
-POST {{baseUrl}}/profiles/view
-Content-Type: application/json
-
-{
-  "mobile": "0812345678",
+  "username": "testuser1",
   "password": "wrongpassword"
 }
-
-### 14. Wrong mobile - Should fail
-POST {{baseUrl}}/profiles/view
-Content-Type: application/json
-
-{
-  "mobile": "0899999999",
-  "password": "mypassword123"
-}
-
-### 15. Missing mobile field - Should fail
-POST {{baseUrl}}/profiles/view
-Content-Type: application/json
-
-{
-  "password": "mypassword123"
-}
-
-### 16. Missing password field - Should fail
-POST {{baseUrl}}/profiles/view
-Content-Type: application/json
-
-{
-  "mobile": "0812345678"
-}
-
-### 17. Empty credentials - Should fail
-POST {{baseUrl}}/profiles/view
-Content-Type: application/json
-
-{
-  "mobile": "",
-  "password": ""
-}
-
-### ========================================
-### ADMIN FEATURES (Bonus)
-### ========================================
-
-### 18. Get all profiles (Admin view) - Success
-GET {{baseUrl}}/profiles
-Accept: application/json
-
-### ========================================
-### COMPLETE WORKFLOW TEST
-### ========================================
-
-### 19. Complete workflow test - Create then view
-# Step 1: Create a test user
-POST {{baseUrl}}/profiles
-Content-Type: application/json
-
-{
-  "username": "workflow_test",
-  "mobile": "0855555555",
-  "cardId": "5555555555555",
-  "password": "workflowpass123"
-}
-
-### Step 2: View the created user
-POST {{baseUrl}}/profiles/view
-Content-Type: application/json
-
-{
-  "mobile": "0855555555",
-  "password": "workflowpass123"
-}
-
-### ========================================
-### EDGE CASES AND SPECIAL CHARACTERS
-### ========================================
-
-### 20. Profile with special characters in username
-POST {{baseUrl}}/profiles
-Content-Type: application/json
-
-{
-  "username": "user_with-special.chars@123",
-  "mobile": "0866666666",
-  "cardId": "6666666666666",
-  "password": "specialchars!@#"
-}
-
-### 21. Profile with numbers only username
-POST {{baseUrl}}/profiles
-Content-Type: application/json
-
-{
-  "username": "1234567890",
-  "mobile": "0877777777",
-  "cardId": "7777777777777",
-  "password": "numbersonly"
-}
-
-### 22. Profile with very long username
-POST {{baseUrl}}/profiles
-Content-Type: application/json
-
-{
-  "username": "very_long_username_that_might_cause_issues_but_should_still_work_fine",
-  "mobile": "0888888888",
-  "cardId": "8888888888888",
-  "password": "verylongusername"
-}
-
-### ========================================
-### PERFORMANCE TESTS
-### ========================================
-
-### 23. Multiple rapid requests (simulate concurrent users)
-POST {{baseUrl}}/profiles
-Content-Type: application/json
-
-{
-  "username": "rapid_user_1",
-  "mobile": "0891111111",
-  "cardId": "9111111111111",
-  "password": "rapid123"
-}
-
-### 24. Another rapid request
-POST {{baseUrl}}/profiles
-Content-Type: application/json
-
-{
-  "username": "rapid_user_2", 
-  "mobile": "0892222222",
-  "cardId": "9222222222222",
-  "password": "rapid456"
-}
-
-### ========================================
-### VERIFICATION TESTS (ข้อ 1 และ 2 ตามโจทย์)
-### ========================================
-
-### ข้อ 1: ดูรายละเอียดของ profile ใด ๆ ก็ได้
-### (ผ่าน mobile + password authentication)
-POST {{baseUrl}}/profiles/view
-Content-Type: application/json
-
-{
-  "mobile": "0812345678",
-  "password": "mypassword123"
-}
-
-### ข้อ 2: เพิ่ม profile ใหม่ ๆ เข้าไปได้
-POST {{baseUrl}}/profiles
-Content-Type: application/json
-
-{
-  "username": "requirement_test",
-  "mobile": "0893333333",
-  "cardId": "9333333333333", 
-  "password": "reqtest789"
-}
-
-### ========================================
-### CLEANUP TESTS (for development)
-### ========================================
-
-### View all profiles to see what we created
-GET {{baseUrl}}/profiles
-Accept: application/json
-

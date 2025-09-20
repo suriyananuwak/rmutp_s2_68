@@ -1,20 +1,11 @@
 import { Hono } from "hono";
 import { PrismaClient } from "../generated/prisma";
 import * as crypto from 'crypto';
+//import { encode, decode } from "./security";
+import { encryptProfile, decryptProfile, encryptData } from "./algorithm";
 
 const app = new Hono();
 const prisma = new PrismaClient();
-
-// Secret Key และ Algorithm สำหรับ encryption
-const ENCRYPTION_SECRET_KEY = process.env.ENCRYPTION_SECRET_KEY || 'your-32-character-secret-key-here123456';
-const ALGORITHM = 'aes-256-gcm';
-
-// Interface สำหรับ encrypted data
-interface EncryptedData {
-  encrypted: string;
-  iv: string;
-  tag: string;
-}
 
 // Type definitions
 interface CreateProfileRequest {
@@ -29,59 +20,6 @@ interface ViewProfileRequest {
   password: string;
 }
 
-// Function สำหรับเข้ารหัสข้อมูล (Encode) - แก้ไข createCipher error
-function encryptData(text: string): EncryptedData {
-  const iv = crypto.randomBytes(16); // สร้าง initialization vector
-  const key = crypto.scryptSync(ENCRYPTION_SECRET_KEY, 'salt', 32); // สร้าง key จาก secret
-  const cipher = crypto.createCipheriv(ALGORITHM, key, iv); // ใช้ createCipheriv แทน createCipher
-  cipher.setAAD(Buffer.from('additional-data')); // Additional authenticated data
-  
-  let encrypted = cipher.update(text, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  
-  const tag = cipher.getAuthTag();
-  
-  return {
-    encrypted: encrypted,
-    iv: iv.toString('hex'),
-    tag: tag.toString('hex')
-  };
-}
-
-// Function สำหรับถอดรหัสข้อมูล (Decode) - แก้ไข createDecipher error
-function decryptData(encryptedData: EncryptedData): string {
-  const iv = Buffer.from(encryptedData.iv, 'hex');
-  const tag = Buffer.from(encryptedData.tag, 'hex');
-  const key = crypto.scryptSync(ENCRYPTION_SECRET_KEY, 'salt', 32); // สร้าง key เดียวกัน
-  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv); // ใช้ createDecipheriv แทน createDecipher
-  
-  decipher.setAAD(Buffer.from('additional-data'));
-  decipher.setAuthTag(tag);
-  
-  let decrypted = decipher.update(encryptedData.encrypted, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  
-  return decrypted;
-}
-
-// Helper function สำหรับเข้ารหัสข้อมูล profile
-function encryptProfileData(data: { username: string; mobile: string; cardId: string }) {
-  return {
-    username: encryptData(data.username),
-    mobile: encryptData(data.mobile),
-    cardId: encryptData(data.cardId)
-  };
-}
-
-// Helper function สำหรับถอดรหัสข้อมูล profile  
-function decryptProfileData(encryptedData: any) {
-  return {
-    username: decryptData(JSON.parse(encryptedData.username)),
-    mobile: decryptData(JSON.parse(encryptedData.mobile)),
-    cardId: decryptData(JSON.parse(encryptedData.cardId))
-  };
-}
-
 // Helper function สำหรับ hash password
 function hashPassword(password: string): string {
   return crypto.createHash('sha256').update(password).digest('hex');
@@ -89,113 +27,9 @@ function hashPassword(password: string): string {
 
 // Original routes
 app.get("/", (c) => c.text("Hello, World!"));
+app.get("/profile", (c) => c.text("Profile Page"));
 
-// GET /profile - ดูข้อมูล profile ทั้งหมด (ถอดรหัสก่อนแสดง)
-app.get("/profile", async (c) => {
-  try {
-    const profiles = await prisma.profile.findMany({
-      select: {
-        id: true,
-        username: true,
-        mobile: true,
-        cardId: true
-        // ไม่ select password
-      },
-      orderBy: { id: 'asc' }
-    });
-
-    // ถอดรหัสข้อมูลก่อนแสดงผล
-    const decryptedProfiles = profiles.map(profile => {
-      try {
-        const decryptedData = decryptProfileData(profile);
-        return {
-          id: profile.id,
-          username: decryptedData.username,
-          mobile: decryptedData.mobile,
-          cardId: decryptedData.cardId
-        };
-      } catch (error) {
-        console.error('Error decrypting profile data:', error);
-        return null;
-      }
-    }).filter(profile => profile !== null);
-
-    return c.json({
-      success: true,
-      data: decryptedProfiles,
-      count: decryptedProfiles.length
-    });
-  } catch (error) {
-    console.error('Error fetching profiles:', error);
-    return c.json({
-      success: false,
-      error: "Failed to fetch profiles"
-    }, 500);
-  }
-});
-
-// GET /profile/:id - ดูข้อมูล profile เฉพาะ id (ถอดรหัสก่อนแสดง)
-app.get("/profile/:id", async (c) => {
-  try {
-    const id = c.req.param('id');
-    
-    if (!id) {
-      return c.json({
-        success: false,
-        error: "Profile ID is required"
-      }, 400);
-    }
-
-    const profile = await prisma.profile.findUnique({
-      where: { id: id },
-      select: {
-        id: true,
-        username: true,
-        mobile: true,
-        cardId: true
-        // ไม่ select password
-      }
-    });
-
-    if (!profile) {
-      return c.json({
-        success: false,
-        error: "Profile not found"
-      }, 404);
-    }
-
-    // ถอดรหัสข้อมูลก่อนแสดงผล
-    try {
-      const decryptedData = decryptProfileData(profile);
-      const profileData = {
-        id: profile.id,
-        username: decryptedData.username,
-        mobile: decryptedData.mobile,
-        cardId: decryptedData.cardId
-      };
-
-      return c.json({
-        success: true,
-        data: profileData
-      });
-    } catch (error) {
-      console.error('Error decrypting profile data:', error);
-      return c.json({
-        success: false,
-        error: "Failed to decrypt profile data"
-      }, 500);
-    }
-
-  } catch (error) {
-    console.error('Error fetching profile:', error);
-    return c.json({
-      success: false,
-      error: "Failed to fetch profile"
-    }, 500);
-  }
-});
-
-// POST /profiles - สร้าง user ใหม่ (เข้ารหัสก่อนบันทึก)
+// Create new profile - สร้าง user ใหม่
 app.post("/profiles", async (c) => {
   try {
     const body: CreateProfileRequest = await c.req.json();
@@ -224,51 +58,40 @@ app.post("/profiles", async (c) => {
       }, 400);
     }
 
-    // เข้ารหัสข้อมูลก่อนตรวจสอบ duplicate
-    const encryptedData = encryptProfileData({
-      username: body.username,
-      mobile: body.mobile,
-      cardId: body.cardId
+    // ตรวจสอบว่า username ซ้ำหรือไม่
+    const existingUsername = await prisma.profile.findUnique({
+      where: { username: body.username }
     });
 
-    // ตรวจสอบ duplicate โดยเปรียบเทียบข้อมูลที่เข้ารหัสแล้ว
-    const allProfiles = await prisma.profile.findMany({
-      select: {
-        username: true,
-        mobile: true,
-        cardId: true
-      }
+    if (existingUsername) {
+      return c.json({
+        success: false,
+        error: "Username already exists"
+      }, 409);
+    }
+
+    // ตรวจสอบว่า mobile ซ้ำหรือไม่
+    const existingMobile = await prisma.profile.findUnique({
+      where: { mobile: body.mobile }
     });
 
-    // ตรวจสอบ duplicate
-    for (const profile of allProfiles) {
-      try {
-        const decryptedProfile = decryptProfileData(profile);
-        
-        if (decryptedProfile.username === body.username) {
-          return c.json({
-            success: false,
-            error: "Username already exists"
-          }, 409);
-        }
-        
-        if (decryptedProfile.mobile === body.mobile) {
-          return c.json({
-            success: false,
-            error: "Mobile number already exists"
-          }, 409);
-        }
-        
-        if (decryptedProfile.cardId === body.cardId) {
-          return c.json({
-            success: false,
-            error: "Card ID already exists"
-          }, 409);
-        }
-      } catch (error) {
-        // หากถอดรหัสไม่ได้ ข้าม record นี้
-        continue;
-      }
+    if (existingMobile) {
+      return c.json({
+        success: false,
+        error: "Mobile number already exists"
+      }, 409);
+    }
+
+    // ตรวจสอบว่า cardId ซ้ำหรือไม่
+    const existingCardId = await prisma.profile.findUnique({
+      where: { cardId: body.cardId }
+    });
+
+    if (existingCardId) {
+      return c.json({
+        success: false,
+        error: "Card ID already exists"
+      }, 409);
     }
 
     // Hash password ก่อนบันทึก
@@ -276,39 +99,31 @@ app.post("/profiles", async (c) => {
     console.log(`Original password: ${body.password}`);
     console.log(`Hashed password: ${hashedPassword}`);
 
-    // สร้าง profile ใหม่ด้วยข้อมูลที่เข้ารหัสแล้ว
+    // สร้าง profile ใหม่ (id จะ generate เป็น uuid อัตโนมัติ)
     const newProfile = await prisma.profile.create({
       data: {
-        username: JSON.stringify(encryptedData.username), // บันทึกเป็น JSON string
-        mobile: JSON.stringify(encryptedData.mobile),
-        cardId: JSON.stringify(encryptedData.cardId),
-        password: hashedPassword
+        username: body.username,
+        mobile: body.mobile,
+        cardId: body.cardId,
+        password: hashedPassword // บันทึก hashed password
       },
       select: {
         id: true,
         username: true,
         mobile: true,
         cardId: true
+        // ไม่ select password เพื่อไม่ให้ return ใน response
       }
     });
 
-    // ถอดรหัสข้อมูลก่อน return
-    const decryptedNewProfile = decryptProfileData(newProfile);
-    const responseData = {
-      id: newProfile.id,
-      username: decryptedNewProfile.username,
-      mobile: decryptedNewProfile.mobile,
-      cardId: decryptedNewProfile.cardId
-    };
-
     return c.json({
       success: true,
-      data: responseData,
+      data: newProfile,
       message: "Profile created successfully"
     }, 201);
 
   } catch (error) {
-    console.error('Error creating profile:', (error as Error).message); // แก้ไข error type
+    console.error('Error creating profile:', error);
     return c.json({
       success: false,
       error: "Failed to create profile"
@@ -316,7 +131,7 @@ app.post("/profiles", async (c) => {
   }
 });
 
-// POST /profiles/view - ดูข้อมูล (ต้องใส่ mobile + password, ถอดรหัสก่อนแสดง)
+// View profile - ดูข้อมูล (ต้องใส่ mobile + password)
 app.post("/profiles/view", async (c) => {
   try {
     const body: ViewProfileRequest = await c.req.json();
@@ -329,57 +144,43 @@ app.post("/profiles/view", async (c) => {
       }, 400);
     }
 
-    // ค้นหา profile โดยเปรียบเทียบข้อมูลที่ถอดรหัสแล้ว
-    const allProfiles = await prisma.profile.findMany();
-    let matchedProfile = null;
-
-    for (const profile of allProfiles) {
-      try {
-        const decryptedData = decryptProfileData({
-          username: profile.username,
-          mobile: profile.mobile,
-          cardId: profile.cardId
-        });
-        
-        if (decryptedData.mobile === body.mobile) {
-          matchedProfile = profile;
-          break;
-        }
-      } catch (error) {
-        // หากถอดรหัสไม่ได้ ข้าม record นี้
-        continue;
-      }
+    // ค้นหา profile ด้วย mobile
+    /*const profile = await prisma.profile.findUnique({
+      where: { mobile: body.mobile }
+    });*/
+    let profile = await prisma.profile.findUnique({
+      where: {mobile: body.mobile}
+    })
+    if (!profile) {
+      const encryptedMobile = encryptData(body.mobile);
+      profile = await prisma.profile.findUnique({
+      where: { mobile: encryptedMobile }
+      });
     }
 
-    if (!matchedProfile) {
+    if (!profile) {
       return c.json({
         success: false,
         error: "User not found"
       }, 404);
     }
 
-    // ตรวจสอบ password
+    // Hash password ที่ user ป้อนเข้ามาแล้วเปรียบเทียบ
     const hashedInputPassword = hashPassword(body.password);
 
-    if (matchedProfile.password !== hashedInputPassword) {
+    if (profile.password !== hashedInputPassword) {
       return c.json({
         success: false,
         error: "Invalid password"
       }, 401);
     }
 
-    // Password ถูกต้อง - ถอดรหัสข้อมูลก่อน return
-    const decryptedProfile = decryptProfileData({
-      username: matchedProfile.username,
-      mobile: matchedProfile.mobile,
-      cardId: matchedProfile.cardId
-    });
-
+    // Password ถูกต้อง - return ข้อมูล profile
     const profileData = {
-      id: matchedProfile.id,
-      username: decryptedProfile.username,
-      mobile: decryptedProfile.mobile,
-      cardId: decryptedProfile.cardId
+      id: profile.id,
+      username: profile.username,
+      mobile: profile.mobile,
+      cardId: profile.cardId
     };
 
     return c.json({
@@ -388,7 +189,7 @@ app.post("/profiles/view", async (c) => {
     });
 
   } catch (error) {
-    console.error('Error viewing profile:', (error as Error).message); // แก้ไข error type
+    console.error('Error viewing profile:', error);
     return c.json({
       success: false,
       error: "Failed to retrieve profile"
@@ -396,7 +197,7 @@ app.post("/profiles/view", async (c) => {
   }
 });
 
-// POST /profiles/login - Login ด้วย username + password (ถอดรหัสก่อนแสดง)
+// Login - ด้วย username + password
 app.post("/profiles/login", async (c) => {
   try {
     const body: any = await c.req.json();
@@ -409,57 +210,44 @@ app.post("/profiles/login", async (c) => {
       }, 400);
     }
 
-    // ค้นหา profile โดยเปรียบเทียบข้อมูลที่ถอดรหัสแล้ว
-    const allProfiles = await prisma.profile.findMany();
-    let matchedProfile = null;
+    // ค้นหา profile ด้วย username
+    /*const profile = await prisma.profile.findUnique({
+      where: { username: body.username }
+    });*/
+    let profile = await prisma.profile.findUnique({
+      where: {username: body.username}
+    })
 
-    for (const profile of allProfiles) {
-      try {
-        const decryptedData = decryptProfileData({
-          username: profile.username,
-          mobile: profile.mobile,
-          cardId: profile.cardId
-        });
-        
-        if (decryptedData.username === body.username) {
-          matchedProfile = profile;
-          break;
-        }
-      } catch (error) {
-        // หากถอดรหัสไม่ได้ ข้าม record นี้
-        continue;
-      }
+    if(!profile){
+      const encryptedUsername = encryptData(body.username);
+      profile = await prisma.profile.findUnique({
+        where: {username: encryptedUsername}
+      })
     }
 
-    if (!matchedProfile) {
+    if (!profile) {
       return c.json({
         success: false,
         error: "Invalid credentials"
       }, 401);
     }
 
-    // ตรวจสอบ password
+    // Hash password ที่ user ป้อนเข้ามาแล้วเปรียบเทียบ
     const hashedInputPassword = hashPassword(body.password);
 
-    if (matchedProfile.password !== hashedInputPassword) {
+    if (profile.password !== hashedInputPassword) {
       return c.json({
         success: false,
         error: "Invalid credentials"
       }, 401);
     }
 
-    // Login สำเร็จ - ถอดรหัสข้อมูลก่อน return
-    const decryptedProfile = decryptProfileData({
-      username: matchedProfile.username,
-      mobile: matchedProfile.mobile,
-      cardId: matchedProfile.cardId
-    });
-
+    // Login สำเร็จ - return ข้อมูล profile
     const profileData = {
-      id: matchedProfile.id,
-      username: decryptedProfile.username,
-      mobile: decryptedProfile.mobile,
-      cardId: decryptedProfile.cardId
+      id: profile.id,
+      username: profile.username,
+      mobile: profile.mobile,
+      cardId: profile.cardId
     };
 
     return c.json({
@@ -469,7 +257,7 @@ app.post("/profiles/login", async (c) => {
     });
 
   } catch (error) {
-    console.error('Error during login:', (error as Error).message); // แก้ไข error type
+    console.error('Error during login:', error);
     return c.json({
       success: false,
       error: "Login failed"
@@ -477,28 +265,30 @@ app.post("/profiles/login", async (c) => {
   }
 });
 
-// Health Check และทดสอบ Encryption
-app.get('/health', (c) => {
+// Get all profiles (bonus - สำหรับ admin ดูรายการทั้งหมด)
+app.get("/profiles", async (c) => {
   try {
-    // ทดสอบ encryption/decryption
-    const testData = 'test_encryption_123';
-    const encrypted = encryptData(testData);
-    const decrypted = decryptData(encrypted);
-    
-    if (decrypted !== testData) {
-      throw new Error('Encryption/Decryption test failed');
-    }
-    
+    const profiles = await prisma.profile.findMany({
+      select: {
+        id: true,
+        username: true,
+        mobile: true,
+        cardId: true
+        // ไม่ select password
+      },
+      orderBy: { username: 'asc' }
+    });
+
     return c.json({
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      encryption: 'working',
-      secret_key_loaded: !!process.env.ENCRYPTION_SECRET_KEY
+      success: true,
+      data: profiles,
+      count: profiles.length
     });
   } catch (error) {
+    console.error('Error fetching profiles:', error);
     return c.json({
-      status: 'unhealthy',
-      error: (error as Error).message // แก้ไข error type
+      success: false,
+      error: "Failed to fetch profiles"
     }, 500);
   }
 });
@@ -512,6 +302,218 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
   await prisma.$disconnect();
   process.exit(0);
+});
+
+// 3. แก้ POST /encode
+app.post("/encode", async (c) => {
+  try {
+    const body: CreateProfileRequest = await c.req.json();
+    
+    // Validation - ตรวจสอบข้อมูลที่จำเป็น
+    if (!body.username || !body.mobile || !body.cardId || !body.password) {
+      return c.json({
+        success: false,
+        error: "All fields are required: username, mobile, cardId, password"
+      }, 400);
+    }
+
+    // ตรวจสอบ mobile format (10 หลัก)
+    if (body.mobile.length !== 10) {
+      return c.json({
+        success: false,
+        error: "Mobile number must be 10 digits"
+      }, 400);
+    }
+
+    // ตรวจสอบ cardId format (13 หลัก)
+    if (body.cardId.length !== 13) {
+      return c.json({
+        success: false,
+        error: "Card ID must be 13 digits"
+      }, 400);
+    }
+
+    // ตรวจสอบว่า username ซ้ำหรือไม่
+    const existingUsername = await prisma.profile.findUnique({
+      where: { username: body.username }
+    });
+
+    if (existingUsername) {
+      return c.json({
+        success: false,
+        error: "Username already exists"
+      }, 409);
+    }
+
+    // ตรวจสอบว่า mobile ซ้ำหรือไม่
+    const existingMobile = await prisma.profile.findUnique({
+      where: { mobile: body.mobile }
+    });
+
+    if (existingMobile) {
+      return c.json({
+        success: false,
+        error: "Mobile number already exists"
+      }, 409);
+    }
+
+    // ตรวจสอบว่า cardId ซ้ำหรือไม่
+    const existingCardId = await prisma.profile.findUnique({
+      where: { cardId: body.cardId }
+    });
+
+    if (existingCardId) {
+      return c.json({
+        success: false,
+        error: "Card ID already exists"
+      }, 409);
+    }
+
+    // Hash password ก่อนบันทึก
+    const hashedPassword = hashPassword(body.password);
+
+    // เข้ารหัสข้อมูลก่อนบันทึก
+    const encryptedData = encryptProfile({
+      username: body.username,
+      mobile: body.mobile,
+      cardId: body.cardId
+    });
+
+    // สร้าง profile ใหม่ด้วยข้อมูลที่เข้ารหัสแล้ว
+    const newProfile = await prisma.profile.create({
+      data: {
+        username: encryptedData.username,
+        mobile: encryptedData.mobile,
+        cardId: encryptedData.cardId,
+        password: hashedPassword
+      },
+      select: {
+        id: true,
+        username: true,
+        mobile: true,
+        cardId: true
+      }
+    });
+
+    return c.json({
+      success: true,
+      data: newProfile,
+      message: "Encrypted profile created successfully"
+    }, 201);
+
+  } catch (error) {
+    console.error('Error creating encrypted profile:', error);
+    return c.json({
+      success: false,
+      error: "Failed to create encrypted profile"
+    }, 500);
+  }
+});
+
+// 4. แก้ POST /decode
+app.post("/decode", async (c) => {
+  try {
+    const body: { id: string } = await c.req.json();
+    
+    // Validation
+    if (!body.id) {
+      return c.json({
+        success: false,
+        error: "Profile ID is required"
+      }, 400);
+    }
+
+    // ค้นหา profile ด้วย id
+    const profile = await prisma.profile.findUnique({
+      where: { id: body.id },
+      select: {
+        id: true,
+        username: true,
+        mobile: true,
+        cardId: true
+      }
+    });
+
+    if (!profile) {
+      return c.json({
+        success: false,
+        error: "Profile not found"
+      }, 404);
+    }
+
+    // ถอดรหัสข้อมูล
+    const decryptedData = decryptProfile({
+      username: profile.username,
+      mobile: profile.mobile,
+      cardId: profile.cardId
+    });
+
+    const profileData = {
+      id: profile.id,
+      username: decryptedData.username,
+      mobile: decryptedData.mobile,
+      cardId: decryptedData.cardId
+    };
+
+    return c.json({
+      success: true,
+      data: profileData,
+      message: "Profile decrypted successfully"
+    });
+
+  } catch (error) {
+    console.error('Error decrypting profile:', error);
+    return c.json({
+      success: false,
+      error: "Failed to decrypt profile"
+    }, 500);
+  }
+});
+
+// 2. เพิ่ม GET /profile/:id (หลัง GET /profiles)
+app.get("/profile/:id", async (c) => {
+  try {
+    const id = c.req.param('id');
+    
+    // Validation
+    if (!id) {
+      return c.json({
+        success: false,
+        error: "Profile ID is required"
+      }, 400);
+    }
+
+    // ค้นหา profile ด้วย id
+    const profile = await prisma.profile.findUnique({
+      where: { id: id },
+      select: {
+        id: true,
+        username: true,
+        mobile: true,
+        cardId: true
+        // ไม่ select password
+      }
+    });
+
+    if (!profile) {
+      return c.json({
+        success: false,
+        error: "Profile not found"
+      }, 404);
+    }
+
+    return c.json({
+      success: true,
+      data: profile
+    });
+
+  } catch (error) {
+    console.error('Error fetching profile:', error);
+    return c.json({
+      success: false,
+      error: "Failed to fetch profile"
+    }, 500);
+  }
 });
 
 export default app;
